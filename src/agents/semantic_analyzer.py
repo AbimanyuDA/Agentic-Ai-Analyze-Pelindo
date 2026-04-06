@@ -18,26 +18,35 @@ from src.utils.cache_manager import CacheManager
 from src.agents.category_schema import format_categories_for_prompt
 
 
-ANALYSIS_PROMPT = """Kamu analis IT Helpdesk PT Pelindo Indonesia.
-Analisa tiket berikut. Field: id=no_tiket, j=judul, d=deskripsi, r=resolved_notes.
-Prioritaskan d dan r untuk memahami masalah (j sering tidak akurat).
+ANALYSIS_PROMPT = """Kamu analis IT Helpdesk PT Pelindo Indonesia tingkat lanjut.
+Tugasmu: mengkategorikan tiket SEAKURAT mungkin berdasarkan CATATAN SOLUSI TEKNIS, bukan sekadar keluhan user.
+
+Data tiket yang diberikan:
+- id: no_tiket
+- serv: Service Offering (Aplikasi/Layanan terkait, sgt penting!)
+- k_asli: Kategori Asli dari Pelapor
+- j: Judul keluhan user
+- d: Deskripsi keluhan user
+- r: Resolved Notes (Catatan teknis perbaikan dari tim IT)
+- rc: Root Cause & Solution (Masalah inti sebenarnya & solusinya)
+
+ATURAN KLASIFIKASI SUPER KETAT:
+1. Bug Aplikasi: Pilih INI JIKA DAN HANYA JIKA tim IT (di field `r` atau `rc`) menyatakan melakukan fix code, query db, restart service, error jaringan, system timeout, "adjust data", dsb. Meski user bilang "gagal", kalau tim IT bilang "sudah sesuai sistem" BERARTI BUKAN BUG.
+2. Human Error: Pilih ini jika tim IT menyatakan user salah input, harus diarahkan (guide), lupa password, "salah tarif", dll.
+3. Tools & Knowledge: Pilih ini jika ini bersifat request (minta akses, minta tambah data khusus, request panduan).
+
+*Prioritaskan `rc` (Root Cause), `r` (Resolved Notes), dan `serv` (Service)! User (d dan j) seringkali keliru menganggap kurang tahu sbg "sistem error".*
 
 TAXONOMY (WAJIB):
 {categories}
-
-Panduan:
-- Human Error: salah prosedur/input, lupa password, tidak tahu cara pakai. Solusi: edukasi, reset, koreksi.
-- Bug Aplikasi: error teknis meski cara pakai benar, ada error message, fitur tidak jalan. Solusi: fix bug, restart, eskalasi dev.
-- Tools & Knowledge: butuh panduan, minta akses/fitur baru, pertanyaan prosedural. Bukan error.
-Untuk Bug Aplikasi: isi kategori_bug. Lainnya: isi "-".
+Untuk Bug Aplikasi: isi kategori_bug dengan jenis error (contoh: "Koneksi Database", "UI Error"). Lainnya isi "-".
 
 TIKET ({n}):
 {tickets_json}
 
-Output JSON array PERSIS format ini (no_tiket dari field id):
+Keluarkan JSON array valid, satu object per tiket:
 [{{"no_tiket":"","tipe_masalah":"Human Error|Bug Aplikasi|Tools & Knowledge","kategori_bug":"-","sub_kategori":"","root_cause":"","summary":"","urgensi":"Low|Medium|High|Critical","tags":[],"aplikasi_terkait":""}}]
-
-Hanya JSON, tidak ada teks lain."""
+Jangan ada spasi/newline ekstra, WAJIB JSON murni!"""
 
 
 # ── Single batch analysis ────────────────────────────────────────────────────
@@ -53,9 +62,12 @@ def analyze_batch(
     for t in tickets:
         tickets_for_prompt.append({
             "id": t.get("no_tiket", ""),
-            "j":  t.get("judul", "")[:60],
-            "d":  t.get("deskripsi", "")[:150],
-            "r":  t.get("resolved_notes", "")[:100],
+            "serv": t.get("service", "")[:40],
+            "k_asli": t.get("kategori_existing", "")[:30],
+            "j":  t.get("judul", "")[:80],
+            "d":  t.get("deskripsi", "")[:120],
+            "r":  t.get("resolved_notes", "")[:150],
+            "rc": t.get("root_cause_solution", "")[:200],
         })
 
     categories_text = format_categories_for_prompt(categories)

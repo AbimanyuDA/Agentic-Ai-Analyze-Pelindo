@@ -27,6 +27,7 @@ COLUMN_MAP = {
     "Alasan": "alasan_existing",
     "Service offering": "service",
     "Lokasi Pelapor": "lokasi",
+    "Root Cause and Solution": "root_cause_raw",
 }
 
 
@@ -61,7 +62,7 @@ def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df = df.rename(columns=rename_map)
 
     # Ensure required columns exist
-    for col in ["no_tiket", "judul", "deskripsi_raw", "resolved_raw"]:
+    for col in ["no_tiket", "judul", "deskripsi_raw", "resolved_raw", "root_cause_raw", "kategori_existing", "alasan_existing", "service", "kelompok"]:
         if col not in df.columns:
             df[col] = ""
 
@@ -72,6 +73,7 @@ def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df["judul"] = df["judul"].apply(lambda x: clean_text(str(x))[:300])
     df["deskripsi"] = df["deskripsi_raw"].apply(lambda x: clean_text(str(x))[:800])
     df["resolved_notes"] = df["resolved_raw"].apply(lambda x: clean_resolved_notes(str(x))[:600])
+    df["root_cause_solution"] = df["root_cause_raw"].apply(lambda x: clean_resolved_notes(str(x))[:600])
     df["no_tiket"] = df["no_tiket"].astype(str).str.strip()
 
     # Drop duplicates by no_tiket (keep latest file)
@@ -97,6 +99,9 @@ def df_to_ticket_list(df: pd.DataFrame) -> list[dict]:
             "judul": str(row.get("judul", "") or ""),
             "deskripsi": str(row.get("deskripsi", "") or ""),
             "resolved_notes": str(row.get("resolved_notes", "") or ""),
+            "root_cause_solution": str(row.get("root_cause_solution", "") or ""),
+            "kategori_existing": str(row.get("kategori_existing", "") or ""),
+            "alasan_existing": str(row.get("alasan_existing", "") or ""),
             "tiket_dibuat": str(row.get("tiket_dibuat", "") or ""),
             "status": str(row.get("status", "") or ""),
             "kelompok": str(row.get("kelompok", "") or ""),
