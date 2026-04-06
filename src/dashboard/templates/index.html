@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pelindo AI Incident Analysis Dashboard</title>
+  <meta name="description" content="Dashboard analisis semantik tiket IT Helpdesk Pelindo menggunakan AI" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:#0a0e1a;--surface:#111827;--surface2:#1a2235;--border:#2a3347;
+      --primary:#6366f1;--primary-glow:rgba(99,102,241,0.22);--secondary:#06b6d4;
+      --success:#10b981;--warning:#f59e0b;--danger:#ef4444;
+      --text:#f1f5f9;--text-muted:#94a3b8;--text-dim:#64748b;
+      --radius:14px;--radius-sm:8px;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+    ::-webkit-scrollbar{width:6px;height:6px;}
+    ::-webkit-scrollbar-track{background:var(--surface);}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+    .sidebar{position:fixed;top:0;left:0;bottom:0;width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:100;}
+    .sidebar-logo{padding:22px 20px 18px;border-bottom:1px solid var(--border);}
+    .sidebar-logo h1{font-size:16px;font-weight:700;}
+    .sidebar-logo span{font-size:11px;color:var(--primary);font-weight:500;letter-spacing:1px;text-transform:uppercase;}
+    .badge{display:inline-block;background:var(--primary-glow);color:var(--primary);font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;margin-top:6px;border:1px solid rgba(99,102,241,0.4);}
+    .nav{padding:14px 10px;flex:1;}
+    .nav-item{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:var(--radius-sm);cursor:pointer;color:var(--text-muted);font-size:13.5px;font-weight:500;transition:all 0.18s;margin-bottom:2px;border:1px solid transparent;user-select:none;}
+    .nav-item:hover{color:var(--text);background:var(--surface2);}
+    .nav-item.active{color:var(--primary);background:var(--primary-glow);border-color:rgba(99,102,241,0.3);}
+    .nav-icon{font-size:15px;width:18px;text-align:center;}
+    .sidebar-bottom{padding:14px 12px;border-top:1px solid var(--border);}
+    .db-status{font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:6px;}
+    .db-dot{width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse 2s infinite;}
+    @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+
+    .main{margin-left:220px;padding:0 28px 40px;}
+    .topbar{display:flex;align-items:center;justify-content:space-between;padding:20px 0 18px;border-bottom:1px solid var(--border);margin-bottom:26px;position:sticky;top:0;background:var(--bg);z-index:90;}
+    .topbar-title{font-size:19px;font-weight:700;}
+    .topbar-subtitle{font-size:12px;color:var(--text-muted);margin-top:2px;}
+    .topbar-right{display:flex;align-items:center;gap:10px;}
+    .btn{padding:8px 16px;border-radius:var(--radius-sm);border:none;cursor:pointer;font-size:12.5px;font-weight:600;font-family:'Inter';transition:all 0.18s;display:inline-flex;align-items:center;gap:6px;}
+    .btn-primary{background:var(--primary);color:#fff;}
+    .btn-primary:hover{background:#4f46e5;transform:translateY(-1px);}
+    .btn-success{background:var(--success);color:#fff;}
+    .btn-success:hover{background:#059669;transform:translateY(-1px);}
+    .btn-outline{background:transparent;color:var(--text-muted);border:1px solid var(--border);}
+    .btn-outline:hover{border-color:var(--primary);color:var(--primary);}
+    .last-updated{font-size:11px;color:var(--text-dim);}
+
+    .page{display:none;animation:fadeIn 0.25s ease;}
+    .page.active{display:block;}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;}}
+
+    .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+    .kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;position:relative;overflow:hidden;transition:transform 0.18s,border-color 0.18s;}
+    .kpi-card:hover{transform:translateY(-2px);border-color:var(--primary);}
+    .kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--primary),var(--secondary));}
+    .kpi-label{font-size:11px;font-weight:600;color:var(--text-dim);letter-spacing:0.8px;text-transform:uppercase;}
+    .kpi-value{font-size:28px;font-weight:700;margin:7px 0 3px;line-height:1;}
+    .kpi-sub{font-size:11.5px;color:var(--text-muted);}
+    .kpi-icon{position:absolute;right:16px;top:16px;font-size:22px;opacity:0.45;}
+
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:18px;}
+    .card-title{font-size:13.5px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+    .card-title span{color:var(--text-dim);font-weight:400;font-size:12px;}
+
+    .charts-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;margin-bottom:18px;}
+    .chart-wrap{position:relative;height:300px;}
+
+    .cat-bar-list{display:flex;flex-direction:column;gap:9px;}
+    .cat-bar-item{display:flex;align-items:center;gap:9px;}
+    .cat-bar-label{width:175px;font-size:12.5px;color:var(--text-muted);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+    .cat-bar-track{flex:1;height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;}
+    .cat-bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--primary),var(--secondary));transition:width 0.7s ease;}
+    .cat-bar-count{width:48px;text-align:right;font-size:12px;font-weight:600;}
+
+    .urgency-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+    .urgency-card{border-radius:var(--radius-sm);padding:12px;text-align:center;border:1px solid;}
+    .urgency-card.critical{background:rgba(220,38,38,0.12);border-color:rgba(220,38,38,0.35);}
+    .urgency-card.high{background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.35);}
+    .urgency-card.medium{background:rgba(245,158,11,0.12);border-color:rgba(245,158,11,0.35);}
+    .urgency-card.low{background:rgba(16,185,129,0.12);border-color:rgba(16,185,129,0.35);}
+    .urgency-card .val{font-size:26px;font-weight:700;}
+    .urgency-card.critical .val{color:#f87171;}.urgency-card.high .val{color:#fca5a5;}
+    .urgency-card.medium .val{color:#fcd34d;}.urgency-card.low .val{color:#6ee7b7;}
+    .urgency-card .lbl{font-size:11px;color:var(--text-muted);margin-top:2px;}
+
+    .filter-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;}
+    .filter-group{display:flex;flex-direction:column;gap:4px;}
+    .filter-label{font-size:11px;color:var(--text-dim);font-weight:500;}
+    .filter-input,.filter-select{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:7px 11px;font-size:12.5px;font-family:'Inter';outline:none;transition:border-color 0.18s;}
+    .filter-input{min-width:200px;}.filter-input:focus,.filter-select:focus{border-color:var(--primary);}
+    .filter-input::placeholder{color:var(--text-dim);}
+    .filter-clear{font-size:12px;color:var(--primary);cursor:pointer;align-self:flex-end;padding-bottom:7px;}
+    .filter-clear:hover{text-decoration:underline;}
+
+    .table-wrap{overflow-x:auto;border-radius:var(--radius-sm);}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    thead th{background:var(--surface2);padding:11px 13px;font-weight:600;color:var(--text-dim);text-align:left;border-bottom:1px solid var(--border);font-size:11px;letter-spacing:0.4px;text-transform:uppercase;white-space:nowrap;}
+    tbody tr{border-bottom:1px solid rgba(42,51,71,0.6);transition:background 0.12s;}
+    tbody tr:hover{background:var(--surface2);}
+    tbody td{padding:10px 13px;vertical-align:top;}
+    .td-summary{max-width:260px;color:var(--text-muted);font-size:12.5px;line-height:1.4;}
+    .td-tiket{font-family:monospace;font-size:11.5px;color:var(--text-dim);}
+    .td-root{max-width:200px;font-size:12px;color:var(--text-muted);line-height:1.4;}
+
+    .pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;}
+    .pill-critical{background:rgba(220,38,38,0.2);color:#f87171;}.pill-high{background:rgba(239,68,68,0.2);color:#fca5a5;}
+    .pill-medium{background:rgba(245,158,11,0.2);color:#fcd34d;}.pill-low{background:rgba(16,185,129,0.2);color:#6ee7b7;}
+    .pill-cat{background:var(--primary-glow);color:#a5b4fc;}.pill-app{background:rgba(6,182,212,0.15);color:#67e8f9;}
+    .tags{display:flex;flex-wrap:wrap;gap:4px;}
+    .tag{background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);font-size:10.5px;padding:2px 7px;border-radius:20px;}
+
+    .pagination{display:flex;align-items:center;justify-content:space-between;margin-top:18px;padding-top:14px;border-top:1px solid var(--border);}
+    .pagination-info{font-size:12px;color:var(--text-dim);}
+    .pagination-btns{display:flex;gap:5px;}
+    .page-btn{padding:5px 11px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);cursor:pointer;font-size:12px;font-family:'Inter';transition:all 0.15s;}
+    .page-btn:hover:not(:disabled){border-color:var(--primary);color:var(--primary);}
+    .page-btn.active{background:var(--primary);color:#fff;border-color:var(--primary);}
+    .page-btn:disabled{opacity:0.4;cursor:not-allowed;}
+
+    .monthly-table-wrap{overflow-x:auto;}
+    .monthly-table tbody td{padding:11px 14px;font-size:13px;}
+    .growth-pos{color:#f87171;font-size:11px;font-weight:600;}
+    .growth-neg{color:#6ee7b7;font-size:11px;font-weight:600;}
+    .month-total{font-size:20px;font-weight:700;}
+
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:1000;opacity:0;pointer-events:none;transition:opacity 0.2s;}
+    .modal-overlay.open{opacity:1;pointer-events:all;}
+    .modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:480px;max-width:calc(100vw - 40px);}
+    .modal-title{font-size:16px;font-weight:700;margin-bottom:6px;}
+    .modal-sub{font-size:13px;color:var(--text-muted);margin-bottom:22px;}
+    .dropzone{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:36px 20px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--surface2);}
+    .dropzone:hover,.dropzone.drag-over{border-color:var(--primary);background:var(--primary-glow);}
+    .dropzone-icon{font-size:36px;margin-bottom:10px;}
+    .dropzone-text{font-size:14px;font-weight:500;color:var(--text-muted);}
+    .dropzone-hint{font-size:12px;color:var(--text-dim);margin-top:6px;}
+    .file-selected{font-size:12.5px;color:var(--success);margin-top:10px;font-weight:500;}
+    .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:22px;}
+    #fileInput{display:none;}
+
+    .progress-toast{position:fixed;bottom:24px;right:24px;width:340px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:0 8px 32px rgba(0,0,0,0.4);z-index:2000;transform:translateY(120px);opacity:0;transition:all 0.35s ease;pointer-events:all;}
+    .progress-toast.show{transform:translateY(0);opacity:1;}
+    .progress-toast-title{font-size:13px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:7px;}
+    .progress-toast-msg{font-size:12px;color:var(--text-muted);margin-bottom:10px;min-height:16px;}
+    .progress-bar-track{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;}
+    .progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--secondary));border-radius:3px;transition:width 0.5s ease;}
+    .progress-pct{font-size:11px;color:var(--text-dim);margin-top:5px;text-align:right;}
+    .toast-close{position:absolute;top:10px;right:12px;cursor:pointer;color:var(--text-dim);font-size:15px;line-height:1;}
+    .spinner-sm{width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin 0.7s linear infinite;display:inline-block;flex-shrink:0;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+
+    .cat-explore-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+    .cat-explore-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;cursor:pointer;transition:all 0.18s;}
+    .cat-explore-card:hover{border-color:var(--primary);transform:translateY(-1px);}
+    .cat-explore-name{font-weight:600;font-size:13.5px;margin-bottom:4px;}
+    .cat-explore-desc{font-size:12px;color:var(--text-muted);margin-bottom:8px;}
+    .cat-explore-subs{display:flex;flex-wrap:wrap;gap:4px;}
+    .sub-pill{background:var(--surface);border:1px solid var(--border);color:var(--text-dim);font-size:10.5px;padding:2px 7px;border-radius:20px;}
+
+    .spinner{border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;width:26px;height:26px;animation:spin 0.7s linear infinite;margin:40px auto;}
+    .loading-state{text-align:center;color:var(--text-muted);padding:40px;}
+    .empty-state{text-align:center;padding:50px 20px;color:var(--text-muted);}
+    .empty-state h3{font-size:17px;margin-bottom:8px;color:var(--text);}
+    .empty-state code{background:var(--surface2);padding:2px 8px;border-radius:4px;color:var(--secondary);}
+
+    /* ── Kluster Page ───────────────────────────────── */
+    .tipe-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px;}
+    .tipe-card{border-radius:var(--radius);padding:20px;border:2px solid;position:relative;overflow:hidden;transition:transform 0.2s,box-shadow 0.2s;cursor:default;}
+    .tipe-card:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,0.4);}
+    .tipe-card.human{background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.35);}
+    .tipe-card.bug{background:rgba(245,158,11,0.08);border-color:rgba(245,158,11,0.35);}
+    .tipe-card.tools{background:rgba(16,185,129,0.08);border-color:rgba(16,185,129,0.35);}
+    .tipe-card-icon{font-size:32px;margin-bottom:10px;}
+    .tipe-card-name{font-size:15px;font-weight:700;margin-bottom:4px;}
+    .tipe-card.human .tipe-card-name{color:#f87171;}
+    .tipe-card.bug .tipe-card-name{color:#fcd34d;}
+    .tipe-card.tools .tipe-card-name{color:#6ee7b7;}
+    .tipe-card-count{font-size:36px;font-weight:800;line-height:1;}
+    .tipe-card.human .tipe-card-count{color:#f87171;}
+    .tipe-card.bug .tipe-card-count{color:#fcd34d;}
+    .tipe-card.tools .tipe-card-count{color:#6ee7b7;}
+    .tipe-card-pct{font-size:12px;color:var(--text-muted);margin:4px 0 12px;}
+    .tipe-card-desc{font-size:11.5px;color:var(--text-dim);line-height:1.5;}
+    .tipe-badge{position:absolute;top:14px;right:14px;font-size:22px;font-weight:800;opacity:0.15;}
+
+    .bug-cluster-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+    .bug-cluster-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;transition:border-color 0.18s;}
+    .bug-cluster-card:hover{border-color:var(--warning);}
+    .bug-cluster-name{font-size:13px;font-weight:600;margin-bottom:2px;color:var(--text);}
+    .bug-cluster-bar-wrap{display:flex;align-items:center;gap:8px;margin:8px 0 4px;}
+    .bug-cluster-bar{flex:1;height:6px;background:var(--surface);border-radius:3px;overflow:hidden;}
+    .bug-cluster-bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#f59e0b,#ef4444);transition:width 0.7s ease;}
+    .bug-cluster-count{font-size:12px;font-weight:600;color:var(--warning);white-space:nowrap;}
+    .bug-cluster-pct{font-size:11px;color:var(--text-dim);}
+    .bug-cluster-apps{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px;}
+
+    .hier-sub-list{display:flex;flex-direction:column;gap:6px;margin-top:10px;}
+    .hier-sub-item{display:flex;align-items:center;gap:8px;}
+    .hier-sub-name{flex:1;font-size:12px;color:var(--text-muted);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+    .hier-sub-bar{width:110px;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;flex-shrink:0;}
+    .hier-sub-fill{height:100%;border-radius:3px;}
+    .hier-sub-count{font-size:11.5px;font-weight:600;color:var(--text-dim);min-width:32px;text-align:right;}
+
+    .urgency-mini{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap;}
+    .urgency-mini-item{font-size:10.5px;padding:1px 7px;border-radius:12px;font-weight:600;}
+    .umi-c{background:rgba(220,38,38,0.2);color:#f87171;}.umi-h{background:rgba(239,68,68,0.2);color:#fca5a5;}
+    .umi-m{background:rgba(245,158,11,0.2);color:#fcd34d;}.umi-l{background:rgba(16,185,129,0.2);color:#6ee7b7;}
+
+    /* ── Insight: Perlu Pertimbangan ─────────────────────────────── */
+    .insight-hero{background:linear-gradient(135deg,rgba(148,163,184,0.07),rgba(99,102,241,0.07));border:1px solid rgba(148,163,184,0.2);border-radius:var(--radius);padding:22px 26px;margin-bottom:18px;}
+    .insight-hero-title{font-size:18px;font-weight:700;margin-bottom:6px;color:var(--text);}
+    .insight-hero-sub{font-size:13px;color:var(--text-muted);line-height:1.6;}
+    .suggest-group-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;}
+    .suggest-group-card{border-radius:var(--radius-sm);padding:18px;border:1.5px solid;transition:transform 0.15s;}
+    .suggest-group-card:hover{transform:translateY(-2px);}
+    .suggest-group-card.human{background:rgba(239,68,68,0.07);border-color:rgba(239,68,68,0.3);}
+    .suggest-group-card.bug{background:rgba(245,158,11,0.07);border-color:rgba(245,158,11,0.3);}
+    .suggest-group-card.tools{background:rgba(16,185,129,0.07);border-color:rgba(16,185,129,0.3);}
+    .suggest-group-icon{font-size:26px;margin-bottom:8px;}
+    .suggest-group-name{font-size:13px;font-weight:700;margin-bottom:2px;}
+    .suggest-group-card.human .suggest-group-name{color:#f87171;}
+    .suggest-group-card.bug .suggest-group-name{color:#fcd34d;}
+    .suggest-group-card.tools .suggest-group-name{color:#6ee7b7;}
+    .suggest-group-count{font-size:30px;font-weight:800;line-height:1;}
+    .suggest-group-card.human .suggest-group-count{color:#f87171;}
+    .suggest-group-card.bug .suggest-group-count{color:#fcd34d;}
+    .suggest-group-card.tools .suggest-group-count{color:#6ee7b7;}
+    .suggest-group-conf{font-size:11px;color:var(--text-dim);margin-top:4px;}
+    .suggest-sub-list{margin-top:10px;display:flex;flex-direction:column;gap:4px;}
+    .suggest-sub-item{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px;}
+    .suggest-sub-name{color:var(--text-muted);flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+    .suggest-sub-count{font-weight:600;color:var(--text-dim);min-width:28px;text-align:right;}
+    .conf-badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10.5px;font-weight:600;}
+    .conf-tinggi{background:rgba(16,185,129,0.2);color:#6ee7b7;}
+    .conf-sedang{background:rgba(245,158,11,0.2);color:#fcd34d;}
+    .conf-rendah{background:rgba(148,163,184,0.15);color:#94a3b8;}
+    .unc-filter-bar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
+    .unc-filter-btn{padding:5px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);font-size:12px;cursor:pointer;transition:all 0.15s;}
+    .unc-filter-btn.active,.unc-filter-btn:hover{background:var(--primary);color:#fff;border-color:var(--primary);}
+    @media(max-width:1100px){.suggest-group-grid{grid-template-columns:1fr;}}
+
+    @media(max-width:1100px){
+      .kpi-grid{grid-template-columns:repeat(2,1fr);}
+      .charts-grid{grid-template-columns:1fr;}
+      .cat-explore-grid{grid-template-columns:1fr;}
+      .tipe-grid{grid-template-columns:1fr;}
+      .bug-cluster-grid{grid-template-columns:1fr;}
+    }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <span>Pelindo IT</span>
+    <h1>Incident Analyzer</h1>
+    <div class="badge">⚡ AI-Powered</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-item active" id="nav-overview"  onclick="goPage('overview')"><span class="nav-icon">📊</span> Overview</div>
+    <div class="nav-item"        id="nav-kluster"   onclick="goPage('kluster')"><span class="nav-icon">🌳</span> Kluster AI</div>
+    <div class="nav-item"        id="nav-insights"  onclick="goPage('insights')"><span class="nav-icon">🤔</span> Perlu Pertimbangan</div>
+    <div class="nav-item"        id="nav-tickets"   onclick="goPage('tickets')"><span class="nav-icon">🎫</span> Tiket</div>
+    <div class="nav-item"        id="nav-categories"onclick="goPage('categories')"><span class="nav-icon">🗂️</span> Kategori</div>
+    <div class="nav-item"        id="nav-trends"    onclick="goPage('trends')"><span class="nav-icon">📈</span> Tren</div>
+    <div class="nav-item"        id="nav-monthly"   onclick="goPage('monthly')"><span class="nav-icon">📅</span> Rekap Bulanan</div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="db-status"><span class="db-dot"></span> SQLite Database Aktif</div>
+    <div style="font-size:10.5px;color:var(--text-dim);margin-top:4px">output/analysis_cache.db</div>
+  </div>
+</aside>
+
+<!-- Main -->
+<main class="main">
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">Dashboard Analisis Insiden</div>
+      <div class="topbar-subtitle">Analisis semantik tiket IT Helpdesk Pelindo menggunakan AI</div>
+    </div>
+    <div class="topbar-right">
+      <span class="last-updated" id="last-updated">Memuat...</span>
+      <button class="btn btn-outline" onclick="openUploadModal()">📂 Upload File</button>
+      <button class="btn btn-success" onclick="exportExcel()">⬇️ Export Excel</button>
+      <button class="btn btn-outline" onclick="refreshAll()">🔄 Refresh</button>
+    </div>
+  </div>
+
+  <!-- Overview -->
+  <section class="page active" id="page-overview">
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-icon">🎫</div><div class="kpi-label">Total Tiket</div><div class="kpi-value" id="kpi-total">—</div><div class="kpi-sub">dari semua file Excel</div></div>
+      <div class="kpi-card"><div class="kpi-icon">🤖</div><div class="kpi-label">Teranalisa AI</div><div class="kpi-value" id="kpi-analyzed">—</div><div class="kpi-sub" id="kpi-coverage">0% coverage</div></div>
+      <div class="kpi-card"><div class="kpi-icon">🗂️</div><div class="kpi-label">Kategori Ditemukan</div><div class="kpi-value" id="kpi-categories">—</div><div class="kpi-sub">kategori semantik AI</div></div>
+      <div class="kpi-card"><div class="kpi-icon">🔴</div><div class="kpi-label">Critical / High</div><div class="kpi-value" id="kpi-critical">—</div><div class="kpi-sub">tiket urgensi tinggi</div></div>
+    </div>
+    <div class="card"><div class="card-title">🚨 Distribusi Urgensi</div>
+      <div class="urgency-grid">
+        <div class="urgency-card critical"><div class="val" id="urg-critical">—</div><div class="lbl">Critical</div></div>
+        <div class="urgency-card high"><div class="val" id="urg-high">—</div><div class="lbl">High</div></div>
+        <div class="urgency-card medium"><div class="val" id="urg-medium">—</div><div class="lbl">Medium</div></div>
+        <div class="urgency-card low"><div class="val" id="urg-low">—</div><div class="lbl">Low</div></div>
+      </div>
+    </div>
+    <div class="charts-grid">
+      <div class="card"><div class="card-title">🗂️ Kategori AI <span>(Top 10)</span></div><div id="cat-bar-list" class="cat-bar-list"></div></div>
+      <div class="card"><div class="card-title">🥧 Distribusi Kategori</div><div class="chart-wrap"><canvas id="pie-chart"></canvas></div></div>
+    </div>
+    <div class="card"><div class="card-title">💻 Top Aplikasi Terdampak</div><div id="app-bar-list" class="cat-bar-list"></div></div>
+  </section>
+
+  <!-- Tickets -->
+  <section class="page" id="page-tickets">
+    <div class="filter-bar">
+      <div class="filter-group"><div class="filter-label">Cari tiket</div><input id="search-input" class="filter-input" type="text" placeholder="No. tiket, judul, atau ringkasan..." oninput="debounceSearch()" /></div>
+      <div class="filter-group"><div class="filter-label">Kategori</div><select id="filter-kategori" class="filter-select" onchange="loadTickets(1)"><option value="">Semua</option></select></div>
+      <div class="filter-group"><div class="filter-label">Urgensi</div><select id="filter-urgensi" class="filter-select" onchange="loadTickets(1)"><option value="">Semua</option><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select></div>
+      <div class="filter-group"><div class="filter-label">Aplikasi</div><select id="filter-aplikasi" class="filter-select" onchange="loadTickets(1)"><option value="">Semua</option></select></div>
+      <div class="filter-group"><div class="filter-label">Sumber File</div><select id="filter-source" class="filter-select" onchange="loadTickets(1)"><option value="">Semua</option></select></div>
+      <span class="filter-clear" onclick="clearFilters()">✕ Reset</span>
+    </div>
+    <div class="card">
+      <div class="card-title">🎫 Daftar Tiket <span id="ticket-count-info"></span></div>
+      <div class="table-wrap" id="ticket-table-wrap"><div class="loading-state"><div class="spinner"></div>Memuat tiket...</div></div>
+      <div class="pagination" id="pagination-bar"></div>
+    </div>
+  </section>
+
+  <!-- Kluster AI -->
+  <section class="page" id="page-kluster">
+    <div id="kluster-content"><div class="loading-state"><div class="spinner"></div>Memuat data kluster...</div></div>
+  </section>
+
+  <!-- Insights: Perlu Pertimbangan -->
+  <section class="page" id="page-insights">
+    <div id="insights-content"><div class="loading-state"><div class="spinner"></div>Memuat insights...</div></div>
+  </section>
+
+  <!-- Categories -->
+  <section class="page" id="page-categories">
+    <div class="card"><div class="card-title">🗂️ Kategori Semantik yang Ditemukan AI</div><div id="cat-explore-content"><div class="loading-state"><div class="spinner"></div></div></div></div>
+    <div class="card">
+      <div class="card-title">📊 Sub-Kategori Breakdown</div>
+      <div style="margin-bottom:12px;"><select id="subcat-kategori-select" class="filter-select" onchange="loadSubcategories()" style="min-width:220px;"><option value="">-- Pilih Kategori --</option></select></div>
+      <div id="subcat-bar-list" class="cat-bar-list"></div>
+    </div>
+  </section>
+
+  <!-- Trends -->
+  <section class="page" id="page-trends">
+    <div class="card"><div class="card-title">📈 Tren Tiket per Bulan <span>(top 6 kategori)</span></div><div class="chart-wrap" style="height:380px;"><canvas id="trend-chart"></canvas></div></div>
+  </section>
+
+  <!-- Monthly -->
+  <section class="page" id="page-monthly">
+    <div class="card">
+      <div class="card-title" style="justify-content:space-between;">
+        <span>📅 Rekap Bulanan</span>
+        <button class="btn btn-success" style="font-size:11.5px;" onclick="exportExcel()">⬇️ Export Excel</button>
+      </div>
+      <div class="chart-wrap" style="height:280px;margin-bottom:18px;"><canvas id="monthly-chart"></canvas></div>
+      <div class="monthly-table-wrap">
+        <table class="monthly-table">
+          <thead><tr><th>Bulan</th><th>Total Tiket</th><th style="text-align:center">Pertumbuhan</th><th>Critical/High</th><th>Kategori Terbanyak</th><th>Top Aplikasi</th><th>Breakdown Urgensi</th></tr></thead>
+          <tbody id="monthly-tbody"><tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-dim)">Memuat data...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Upload Modal -->
+<div class="modal-overlay" id="upload-modal" onclick="onModalOverlayClick(event)">
+  <div class="modal">
+    <div class="modal-title">📂 Upload File Excel Baru</div>
+    <div class="modal-sub">Upload file .xlsx dengan data tiket insiden. AI akan menganalisa semua tiket secara otomatis.</div>
+    <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+      <div class="dropzone-icon">📊</div>
+      <div class="dropzone-text">Klik atau drag &amp; drop file di sini</div>
+      <div class="dropzone-hint">Format: .xlsx | Maks: 100 MB</div>
+      <div class="file-selected" id="file-selected-name" style="display:none"></div>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx" onchange="onFileSelected(event)" />
+    <div style="margin-top:14px;padding:12px;background:var(--surface2);border-radius:var(--radius-sm);font-size:12px;color:var(--text-muted);line-height:1.6;">
+      ℹ️ <strong>File akan disimpan ke folder Knowledge/</strong> dan analisis AI akan berjalan otomatis.
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeUploadModal()">Batal</button>
+      <button class="btn btn-primary" id="upload-btn" onclick="doUpload()" disabled>🚀 Upload &amp; Analisa</button>
+    </div>
+  </div>
+</div>
+
+<!-- Progress Toast -->
+<div class="progress-toast" id="progress-toast">
+  <span class="toast-close" onclick="hideToast()">✕</span>
+  <div class="progress-toast-title"><span class="spinner-sm" id="toast-spinner"></span> <span id="toast-title">Analisis Berjalan...</span></div>
+  <div class="progress-toast-msg" id="toast-msg">Memulai...</div>
+  <div class="progress-bar-track"><div class="progress-bar-fill" id="progress-bar" style="width:0%"></div></div>
+  <div class="progress-pct" id="progress-pct">0%</div>
+</div>
+
+<script>
+'use strict';
+// ── State ───────────────────────────────────────────────────────────
+let currentPage = 1;
+let searchTimer = null;
+let pieChart = null, trendChart = null, monthlyBarChart = null;
+let progressInterval = null;
+let selectedFile = null;
+let toastHidden = false;
+
+const C = ['#6366f1','#06b6d4','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#3b82f6'];
+const fmt = n => typeof n === 'number' ? n.toLocaleString('id-ID') : (n != null ? n : '—');
+
+// ── API ─────────────────────────────────────────────────────────────
+async function api(url) {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    return await r.json();
+  } catch(e) { console.warn('API error', url, e.message); return null; }
+}
+
+// ── Navigation ──────────────────────────────────────────────────────
+function goPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const page = document.getElementById('page-' + name);
+  const nav  = document.getElementById('nav-' + name);
+  if (page) page.classList.add('active');
+  if (nav)  nav.classList.add('active');
+  if (name === 'tickets')    { loadFilterOptions(); loadTickets(1); }
+  if (name === 'kluster')    { loadKluster(); }
+  if (name === 'insights')   { loadInsights(); }
+  if (name === 'categories') { loadCategories(); }
+  if (name === 'trends')     { loadTrends(); }
+  if (name === 'monthly')    { loadMonthly(); }
+}
+function refreshAll() {
+  loadStats();
+  const a = document.querySelector('.page.active');
+  if (!a) return;
+  if (a.id==='page-tickets')  loadTickets(currentPage);
+  if (a.id==='page-trends')   loadTrends();
+  if (a.id==='page-monthly')  loadMonthly();
+}
+
+// ── Stats ───────────────────────────────────────────────────────────
+async function loadStats() {
+  const d = await api('/api/stats');
+  if (!d) { showNoData(); return; }
+  document.getElementById('kpi-total').textContent     = fmt(d.total_tickets);
+  document.getElementById('kpi-analyzed').textContent  = fmt(d.analyzed_tickets);
+  document.getElementById('kpi-coverage').textContent  = (d.analysis_coverage||0) + '% coverage';
+  document.getElementById('kpi-categories').textContent= d.top_categories?.length || '—';
+  const ch = (d.urgency?.Critical||0) + (d.urgency?.High||0);
+  document.getElementById('kpi-critical').textContent  = fmt(ch);
+  document.getElementById('urg-critical').textContent  = fmt(d.urgency?.Critical||0);
+  document.getElementById('urg-high').textContent      = fmt(d.urgency?.High||0);
+  document.getElementById('urg-medium').textContent    = fmt(d.urgency?.Medium||0);
+  document.getElementById('urg-low').textContent       = fmt(d.urgency?.Low||0);
+  if (d.generated_at) {
+    const dt = new Date(d.generated_at);
+    document.getElementById('last-updated').textContent = 'Update: ' + dt.toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'});
+  }
+  renderBars(d.top_categories,   'cat-bar-list');
+  renderBars(d.top_applications, 'app-bar-list','#06b6d4','#0891b2');
+  renderPie(d.top_categories?.slice(0,8));
+}
+function showNoData() {
+  const el = document.getElementById('cat-bar-list');
+  if (el) el.innerHTML = '<div class="empty-state"><h3>⏳ Analisis Sedang Berjalan</h3><p>Data akan tampil otomatis saat analisis selesai.<br/>Pantau progress di pojok kanan bawah.</p></div>';
+  document.getElementById('last-updated').textContent = 'Menunggu data...';
+}
+function renderBars(items, id, c1='#6366f1', c2='#06b6d4') {
+  const el = document.getElementById(id);
+  if (!el || !items?.length) return;
+  const mx = items[0].count || 1;
+  el.innerHTML = items.slice(0,10).map(it =>
+    `<div class="cat-bar-item">
+      <div class="cat-bar-label" title="${it.name}">${it.name}</div>
+      <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${Math.round(it.count/mx*100)}%;background:linear-gradient(90deg,${c1},${c2})"></div></div>
+      <div class="cat-bar-count">${fmt(it.count)}</div>
+    </div>`).join('');
+}
+function renderPie(items) {
+  if (!items?.length) return;
+  const ctx = document.getElementById('pie-chart')?.getContext('2d');
+  if (!ctx) return;
+  if (pieChart) { pieChart.destroy(); pieChart=null; }
+  pieChart = new Chart(ctx,{
+    type:'doughnut',
+    data:{labels:items.map(i=>i.name),datasets:[{data:items.map(i=>i.count),backgroundColor:C.slice(0,items.length),borderWidth:2,borderColor:'#111827'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#94a3b8',font:{size:11},boxWidth:12,padding:8}}}}
+  });
+}
+
+// ── Trends ──────────────────────────────────────────────────────────
+async function loadTrends() {
+  const d = await api('/api/trends');
+  const wrap = document.getElementById('trend-chart')?.parentElement;
+  if (!d?.months?.length) {
+    if (wrap) wrap.innerHTML = '<div class="empty-state"><h3>Belum ada data tren</h3><p>Tunggu analisis selesai.</p></div>';
+    return;
+  }
+  const ctx = document.getElementById('trend-chart')?.getContext('2d');
+  if (!ctx) return;
+  if (trendChart) { trendChart.destroy(); trendChart=null; }
+  trendChart = new Chart(ctx,{
+    type:'line',
+    data:{labels:d.months,datasets:d.categories.map((cat,i)=>({label:cat,data:d.data[cat],borderColor:C[i%C.length],backgroundColor:C[i%C.length]+'22',fill:true,tension:0.4,pointRadius:4,borderWidth:2}))},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#94a3b8',font:{size:11},boxWidth:12}}},
+      scales:{x:{grid:{color:'#2a3347'},ticks:{color:'#64748b',font:{size:11}}},y:{grid:{color:'#2a3347'},ticks:{color:'#64748b',font:{size:11}},beginAtZero:true}}}
+  });
+}
+
+// ── Monthly ─────────────────────────────────────────────────────────
+async function loadMonthly() {
+  const rows = await api('/api/monthly');
+  const tbody = document.getElementById('monthly-tbody');
+  if (!rows?.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-dim)">Belum ada data. Tunggu analisis selesai.</td></tr>';
+    return;
+  }
+  const UC = {Critical:'pill-critical',High:'pill-high',Medium:'pill-medium',Low:'pill-low'};
+  const mx = Math.max(...rows.map(r=>r.total),1);
+  const ORDER = ['Critical','High','Medium','Low'];
+  tbody.innerHTML = [...rows].reverse().map(r => {
+    const g = r.growth==null ? '—' : r.growth>0
+      ? `<span class="growth-pos">▲ ${r.growth}%</span>`
+      : `<span class="growth-neg">▼ ${Math.abs(r.growth)}%</span>`;
+    const u = r.by_urgency||{};
+    const uh = ORDER.filter(k=>u[k]).map(k=>`<span class="pill ${UC[k]}" style="margin-right:3px">${k[0]} ${u[k]}</span>`).join('');
+    return `<tr>
+      <td style="font-weight:600;white-space:nowrap">${r.month_label}</td>
+      <td><div style="font-size:20px;font-weight:700">${fmt(r.total)}</div>
+          <div style="margin-top:4px;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;width:80px">
+            <div style="height:100%;width:${Math.round(r.total/mx*100)}%;background:linear-gradient(90deg,var(--primary),var(--secondary));border-radius:3px"></div>
+          </div></td>
+      <td style="text-align:center">${g}</td>
+      <td><span class="pill pill-critical">${r.critical_high}</span></td>
+      <td><span class="pill pill-cat">${r.top_category}</span></td>
+      <td style="font-size:12px;color:var(--text-muted)">${r.top_app}</td>
+      <td>${uh}</td>
+    </tr>`;
+  }).join('');
+
+  const ctx = document.getElementById('monthly-chart')?.getContext('2d');
+  if (ctx) {
+    if (monthlyBarChart) { monthlyBarChart.destroy(); monthlyBarChart=null; }
+    const sorted = [...rows];
+    const allCats = [...new Set(sorted.flatMap(r=>Object.keys(r.by_category||{})))];
+    monthlyBarChart = new Chart(ctx,{
+      type:'bar',
+      data:{labels:sorted.map(r=>r.month_label),datasets:allCats.slice(0,8).map((cat,i)=>({
+        label:cat,data:sorted.map(r=>(r.by_category||{})[cat]||0),
+        backgroundColor:C[i%C.length]+'cc',borderColor:C[i%C.length],borderWidth:1
+      }))},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{labels:{color:'#94a3b8',font:{size:11},boxWidth:12}}},
+        scales:{x:{stacked:true,grid:{color:'#2a3347'},ticks:{color:'#64748b',font:{size:11}}},
+                y:{stacked:true,grid:{color:'#2a3347'},ticks:{color:'#64748b',font:{size:11}},beginAtZero:true}}}
+    });
+  }
+}
+
+// ── Filter Options ──────────────────────────────────────────────────
+async function loadFilterOptions() {
+  const opts = await api('/api/filter_options');
+  if (!opts) return;
+  const fill = (id, items, label) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = `<option value="">${label}</option>` + items.map(c=>`<option${c===cur?' selected':''}>${c}</option>`).join('');
+  };
+  fill('filter-kategori',       opts.categories,   'Semua Kategori');
+  fill('filter-aplikasi',       opts.applications, 'Semua Aplikasi');
+  fill('filter-source',         opts.sources,      'Semua File');
+  fill('subcat-kategori-select',opts.categories,   '-- Pilih Kategori --');
+}
+
+// ── Tickets ─────────────────────────────────────────────────────────
+async function loadTickets(page) {
+  currentPage = page;
+  const wrap = document.getElementById('ticket-table-wrap');
+  wrap.innerHTML = '<div class="loading-state"><div class="spinner"></div>Memuat tiket...</div>';
+  const p = new URLSearchParams({
+    page, per_page:50,
+    search:   document.getElementById('search-input')?.value    ||'',
+    kategori: document.getElementById('filter-kategori')?.value ||'',
+    urgensi:  document.getElementById('filter-urgensi')?.value  ||'',
+    aplikasi: document.getElementById('filter-aplikasi')?.value ||'',
+    source:   document.getElementById('filter-source')?.value   ||'',
+  });
+  const d = await api('/api/tickets?'+p);
+  if (!d)              { wrap.innerHTML='<div class="empty-state"><h3>Gagal memuat data</h3></div>'; return; }
+  if (!d.tickets?.length) {
+    wrap.innerHTML='<div class="empty-state"><h3>Tidak ada tiket</h3><p>Coba ubah filter atau tunggu analisis selesai.</p></div>';
+    document.getElementById('pagination-bar').innerHTML='';
+    document.getElementById('ticket-count-info').textContent='';
+    return;
+  }
+  document.getElementById('ticket-count-info').textContent = `(${fmt(d.total)} tiket)`;
+  const UC={Critical:'pill-critical',High:'pill-high',Medium:'pill-medium',Low:'pill-low'};
+  const rows = d.tickets.map(t => {
+    const tags = Array.isArray(t.tags) ? t.tags.slice(0,3).map(g=>`<span class="tag">${g}</span>`).join('') : '';
+    return `<tr>
+      <td class="td-tiket">${t.no_tiket||'—'}</td>
+      <td style="max-width:160px;font-size:13px;font-weight:500">${t.judul||'—'}</td>
+      <td class="td-summary">${t.summary||'—'}</td>
+      <td><span class="pill pill-cat">${t.kategori_utama||'—'}</span><br/><small style="color:var(--text-dim);font-size:11px">${t.sub_kategori||''}</small></td>
+      <td class="td-root">${t.root_cause||'—'}</td>
+      <td><span class="pill ${UC[t.urgensi]||'pill-low'}">${t.urgensi||'—'}</span></td>
+      <td><span class="pill pill-app">${t.aplikasi_terkait||'N/A'}</span></td>
+      <td><div class="tags">${tags}</div></td>
+    </tr>`;
+  }).join('');
+  wrap.innerHTML = `<table><thead><tr>
+    <th>No. Tiket</th><th>Judul</th><th>AI Summary</th>
+    <th>Kategori AI</th><th>Root Cause</th><th>Urgensi</th><th>Aplikasi</th><th>Tags</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+  renderPagination(d.page, d.total_pages, d.total);
+}
+function renderPagination(page, totalPages, totalItems) {
+  const start=(page-1)*50+1, end=Math.min(page*50,totalItems);
+  const range=[];
+  if (totalPages<=7) { for(let i=1;i<=totalPages;i++) range.push(i); }
+  else {
+    range.push(1);
+    if (page>3) range.push('…');
+    for(let i=Math.max(2,page-1);i<=Math.min(totalPages-1,page+1);i++) range.push(i);
+    if (page<totalPages-2) range.push('…');
+    range.push(totalPages);
+  }
+  const btns = range.map(p=>typeof p==='number'
+    ?`<button class="page-btn${p===page?' active':''}" onclick="loadTickets(${p})">${p}</button>`
+    :`<span class="page-btn" style="cursor:default">…</span>`).join('');
+  document.getElementById('pagination-bar').innerHTML=`
+    <div class="pagination-info">Menampilkan ${fmt(start)}–${fmt(end)} dari ${fmt(totalItems)} tiket</div>
+    <div class="pagination-btns">
+      <button class="page-btn" onclick="loadTickets(${page-1})" ${page===1?'disabled':''}>← Prev</button>
+      ${btns}
+      <button class="page-btn" onclick="loadTickets(${page+1})" ${page===totalPages?'disabled':''}>Next →</button>
+    </div>`;
+}
+function debounceSearch() { clearTimeout(searchTimer); searchTimer=setTimeout(()=>loadTickets(1),380); }
+function clearFilters() {
+  ['search-input','filter-kategori','filter-urgensi','filter-aplikasi','filter-source']
+    .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  loadTickets(1);
+}
+
+// ── Kluster AI ──────────────────────────────────────────────────────
+async function loadKluster() {
+  const el = document.getElementById('kluster-content');
+  el.innerHTML = '<div class="loading-state"><div class="spinner"></div>Memuat data kluster...</div>';
+  const d = await api('/api/hierarchy');
+  if (!d || d.error) {
+    el.innerHTML = '<div class="empty-state"><h3>⏳ Belum Ada Data</h3><p>Jalankan analisis terlebih dahulu.</p></div>';
+    return;
+  }
+
+  const tipeConfig = {
+    'Human Error':       { cls:'human', icon:'🙋', color:'#f87171', grad:'#ef4444,#b91c1c', desc:'Kesalahan pengguna: salah input, lupa password, prosedur tidak diikuti' },
+    'Bug Aplikasi':      { cls:'bug',   icon:'🐛', color:'#fcd34d', grad:'#f59e0b,#d97706', desc:'Bug/defect sistem: error teknis, crash, fitur tidak berjalan sesuai ekspektasi' },
+    'Tools & Knowledge': { cls:'tools', icon:'🛠️', color:'#6ee7b7', grad:'#10b981,#059669', desc:'Permintaan bantuan, panduan, request akses, atau pertanyaan prosedural' },
+  };
+  const urgCls   = {Critical:'umi-c', High:'umi-h', Medium:'umi-m', Low:'umi-l'};
+  const urgOrder = ['Critical','High','Medium','Low'];
+  let html = '';
+
+  // ── Level 1: 3 Tipe Cards ─────────────────────────────────────────
+  html += '<div class="tipe-grid">';
+  for (const node of d.nodes) {
+    const cfg = tipeConfig[node.tipe] || {cls:'bug',icon:'❓',color:'#94a3b8',grad:'#64748b,#475569',desc:''};
+    const urg = node.urgency || {};
+    const urgBadges = urgOrder.filter(k=>urg[k]).map(k=>`<span class="urgency-mini-item ${urgCls[k]}">${k[0]} ${urg[k]}</span>`).join('');
+    html += `<div class="tipe-card ${cfg.cls}">
+      <div class="tipe-badge">${node.pct}%</div>
+      <div class="tipe-card-icon">${cfg.icon}</div>
+      <div class="tipe-card-name">${node.tipe}</div>
+      <div class="tipe-card-count">${fmt(node.count)}</div>
+      <div class="tipe-card-pct">${node.pct}% dari total tiket</div>
+      <div class="tipe-card-desc">${cfg.desc}</div>
+      <div class="urgency-mini" style="margin-top:10px">${urgBadges||'<span style="color:var(--text-dim);font-size:11px">—</span>'}</div>
+    </div>`;
+  }
+  // Perlu Pertimbangan mini-card
+  if (d.uncategorized_count > 0) {
+    html += `<div class="tipe-card" style="background:rgba(148,163,184,0.08);border-color:rgba(148,163,184,0.35)">
+      <div class="tipe-badge">${d.summary?.uncategorized?.pct||0}%</div>
+      <div class="tipe-card-icon">🤔</div>
+      <div class="tipe-card-name" style="color:#94a3b8">Perlu Pertimbangan</div>
+      <div class="tipe-card-count" style="color:#94a3b8">${fmt(d.uncategorized_count)}</div>
+      <div class="tipe-card-pct">${d.summary?.uncategorized?.pct||0}% dari total tiket</div>
+      <div class="tipe-card-desc">Tiket yang belum dapat dikategorikan dalam 3 tipe utama — perlu review manual</div>
+    </div>`;
+  }
+  html += '</div>';
+
+  // ── Level 2: Sub-cluster per SEMUA Tipe ───────────────────────────
+  for (const node of d.nodes) {
+    const cfg = tipeConfig[node.tipe] || {color:'#94a3b8', grad:'#64748b,#475569', icon:'❓'};
+    const clusters = node.clusters || [];
+    if (clusters.length === 0) continue;
+    const maxCount = clusters[0]?.count || 1;
+    const topApps = (node.top_apps||[]).map(a=>`<span class="tag">${a.name} (${a.count})</span>`).join('');
+
+    html += `<div class="card">
+      <div class="card-title" style="color:${cfg.color}">${cfg.icon} ${node.tipe}
+        <span style="color:var(--text-dim);font-size:11.5px;font-weight:400"> — Sub-kluster (${fmt(node.count)} tiket)</span>
+      </div>
+      <div class="bug-cluster-grid">`;
+
+    for (const cl of clusters) {
+      const appTags = (cl.top_apps||[]).map(a=>`<span class="tag">${a.name}</span>`).join('');
+      html += `<div class="bug-cluster-card" style="border-color:rgba(255,255,255,0.06)">
+        <div class="bug-cluster-name" style="color:${cfg.color}">● ${cl.name}</div>
+        <div class="bug-cluster-bar-wrap">
+          <div class="bug-cluster-bar"><div class="bug-cluster-bar-fill"
+            style="width:${Math.round(cl.count/maxCount*100)}%;background:linear-gradient(90deg,${cfg.grad})"></div></div>
+          <div class="bug-cluster-count" style="color:${cfg.color}">${fmt(cl.count)}</div>
+        </div>
+        <div class="bug-cluster-pct">${cl.pct}% dari ${node.tipe}</div>
+        ${appTags?`<div class="bug-cluster-apps">${appTags}</div>`:''}
+      </div>`;
+    }
+    html += '</div>';
+    if (topApps) html += `<div style="margin-top:12px"><span style="font-size:11px;color:var(--text-dim)">Top aplikasi: </span>${topApps}</div>`;
+    html += '</div>';
+  }
+
+  // ── Perlu Pertimbangan Section ────────────────────────────────────
+  if (d.uncategorized && d.uncategorized.length > 0) {
+    const unc = d.uncategorized;
+    const urgColor = {Critical:'#f87171',High:'#fca5a5',Medium:'#fcd34d',Low:'#6ee7b7'};
+    html += `<div class="card" style="border-color:rgba(148,163,184,0.3)">
+      <div class="card-title" style="color:#94a3b8">🤔 Perlu Pertimbangan
+        <span style="color:var(--text-dim);font-size:11.5px;font-weight:400"> — ${fmt(unc.length)} tiket tidak terklasifikasi</span>
+      </div>
+      <p style="font-size:12px;color:var(--text-dim);margin-bottom:14px">
+        Tiket-tiket berikut belum dapat dikategorikan ke dalam Human Error, Bug Aplikasi, atau Tools &amp; Knowledge.
+        Mohon review secara manual untuk menentukan kategori yang tepat.
+      </p>
+      <div style="overflow-x:auto"><table>
+        <thead><tr>
+          <th>No. Tiket</th><th>Judul</th><th>Summary AI</th>
+          <th>Tipe Terdeteksi</th><th>Urgensi</th><th>Aplikasi</th>
+        </tr></thead>
+        <tbody>${unc.slice(0,50).map(u=>`<tr>
+          <td class="td-tiket">${u.no_tiket||'—'}</td>
+          <td style="font-size:12px;max-width:160px">${u.judul||'—'}</td>
+          <td class="td-summary">${u.summary||'—'}</td>
+          <td><span class="tag" style="color:#94a3b8">${u.raw_tipe||'—'}</span></td>
+          <td><span style="color:${urgColor[u.urgensi]||'#6ee7b7'};font-size:12px;font-weight:600">${u.urgensi||'—'}</span></td>
+          <td><span class="pill pill-app">${u.aplikasi_terkait||'N/A'}</span></td>
+        </tr>`).join('')}
+        ${unc.length>50?`<tr><td colspan="6" style="text-align:center;color:var(--text-dim);font-size:12px">... dan ${fmt(unc.length-50)} tiket lainnya</td></tr>`:''}
+        </tbody>
+      </table></div>
+    </div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+
+// ── Insights: Perlu Pertimbangan ────────────────────────────────────
+let _insightsData = null;
+let _discoverData = null;
+let _insightsFilter = 'all';
+
+async function loadInsights() {
+  const el = document.getElementById('insights-content');
+  el.innerHTML = '<div class="loading-state"><div class="spinner"></div>Memuat analisis...</div>';
+
+  // Load both in parallel
+  const [ins, disc] = await Promise.all([
+    api('/api/uncategorized/insights'),
+    api('/api/uncategorized/discover'),
+  ]);
+  _insightsData = ins;
+  _discoverData = disc;
+
+  if (!ins || ins.total === 0) {
+    el.innerHTML = '<div class="empty-state"><h3>✅ Semua Tiket Sudah Terkategori</h3></div>';
+    return;
+  }
+
+  const tipeConfig = {
+    'Human Error':       {cls:'human', icon:'🙋', color:'#f87171'},
+    'Bug Aplikasi':      {cls:'bug',   icon:'🐛', color:'#fcd34d'},
+    'Tools & Knowledge': {cls:'tools', icon:'🛠️', color:'#6ee7b7'},
+  };
+  const confClass = {Tinggi:'conf-tinggi', Sedang:'conf-sedang', Rendah:'conf-rendah'};
+  const urgColor  = {Critical:'#f87171', High:'#fca5a5', Medium:'#fcd34d', Low:'#6ee7b7'};
+
+  let html = '';
+
+  // ── Hero ────────────────────────────────────────────────────────
+  html += `<div class="insight-hero">
+    <div class="insight-hero-title">🔬 Penemuan Kategori Baru — AI Analysis</div>
+    <div class="insight-hero-sub">
+      <strong>${fmt(ins.total)} tiket</strong> tidak dapat dimasukkan ke dalam 3 kategori utama.
+      AI telah menganalisis pola dan mengusulkan <strong>kategori-kategori baru</strong> yang relevan
+      untuk konteks PT Pelindo. Gunakan insight ini untuk memperluas taksonomi jika diperlukan.
+      <span style="color:var(--text-dim)"> | Metode: ${disc?.method || '—'}</span>
+      <button onclick="refreshDiscover()" style="float:right;padding:4px 12px;border-radius:12px;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);font-size:11px;cursor:pointer;">🔄 Refresh AI</button>
+    </div>
+  </div>`;
+
+  // ── Section 1: AI-Proposed NEW Categories ───────────────────────
+  if (disc?.new_categories?.length > 0) {
+    const newCats = disc.new_categories.filter(c => !c.error);
+    const palettes = [
+      {bg:'rgba(99,102,241,0.08)', border:'rgba(99,102,241,0.35)', color:'#a5b4fc'},
+      {bg:'rgba(236,72,153,0.08)', border:'rgba(236,72,153,0.35)', color:'#f9a8d4'},
+      {bg:'rgba(20,184,166,0.08)', border:'rgba(20,184,166,0.35)', color:'#5eead4'},
+      {bg:'rgba(251,146,60,0.08)', border:'rgba(251,146,60,0.35)', color:'#fdba74'},
+      {bg:'rgba(168,85,247,0.08)', border:'rgba(168,85,247,0.35)', color:'#d8b4fe'},
+      {bg:'rgba(234,179,8,0.08)',  border:'rgba(234,179,8,0.35)',  color:'#fde68a'},
+    ];
+    html += `<div class="card" style="border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.03)">
+      <div class="card-title" style="color:#a5b4fc">✨ Kategori Baru yang Diusulkan AI
+        <span style="color:var(--text-dim);font-size:11.5px;font-weight:400"> — berdasarkan pola dari ${fmt(ins.total)} tiket tidak terkategori</span>
+      </div>
+      <p style="font-size:12px;color:var(--text-dim);margin-bottom:18px">
+        AI menganalisis pola tipe, sub-kluster, dan summary untuk menemukan kelompok tiket yang
+        belum tercakup dalam taksonomi saat ini. Kategori di bawah adalah <em>usulan</em> — perlu validasi oleh tim IT Pelindo.
+      </p>
+      <div class="suggest-group-grid" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">`;
+
+    newCats.forEach((cat, i) => {
+      const pal = palettes[i % palettes.length];
+      const chars = (cat.karakteristik || []).map(c => `<li style="font-size:11.5px;color:var(--text-muted)">${c}</li>`).join('');
+      const related = (cat.raw_tipe_terkait || []).map(r => `<span class="tag" style="font-size:10px">${r}</span>`).join('');
+      html += `<div style="background:${pal.bg};border:1.5px solid ${pal.border};border-radius:var(--radius-sm);padding:18px">
+        <div style="font-size:24px;margin-bottom:8px">💡</div>
+        <div style="font-size:14px;font-weight:700;color:${pal.color};margin-bottom:6px">${cat.nama_kategori}</div>
+        ${cat.jumlah_estimasi > 0 ? `<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">~${fmt(cat.jumlah_estimasi)} tiket estimasi</div>` : ''}
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.55">${cat.deskripsi || ''}</div>
+        ${chars ? `<ul style="margin:0 0 10px 16px;padding:0">${chars}</ul>` : ''}
+        ${cat.rekomendasi_aksi ? `<div style="background:rgba(255,255,255,0.04);border-radius:6px;padding:8px 10px;font-size:11.5px;color:var(--text-dim);margin-bottom:8px">
+          <strong style="color:${pal.color}">Aksi:</strong> ${cat.rekomendasi_aksi}
+        </div>` : ''}
+        ${related ? `<div style="margin-top:6px"><span style="font-size:10px;color:var(--text-dim)">Pola tipe: </span>${related}</div>` : ''}
+      </div>`;
+    });
+    html += '</div></div>';
+  } else if (disc?.llm_available === false) {
+    html += `<div class="card" style="border-color:rgba(251,146,60,0.3)">
+      <div class="card-title" style="color:#fdba74">⚠️ LLM Tidak Tersedia</div>
+      <p style="font-size:12px;color:var(--text-dim)">API key tidak dikonfigurasi. Hanya analisis statistik yang ditampilkan.</p>
+    </div>`;
+  }
+
+  // ── Section 2: Statistical Cluster Patterns ───────────────────
+  if (disc?.statistical_clusters?.length > 0) {
+    const maxCount = disc.statistical_clusters[0]?.count || 1;
+    html += `<div class="card">
+      <div class="card-title">📊 Pola Statistik — Tipe yang Sering Muncul
+        <span style="color:var(--text-dim);font-size:11.5px;font-weight:400"> (nilai mentah dari AI, belum distandarisasi)</span>
+      </div>
+      <div class="bug-cluster-grid">`;
+    for (const cl of disc.statistical_clusters.slice(0, 20)) {
+      const subs = cl.top_subs.map(s => `<span class="tag" style="font-size:10px">${s.name} (${s.count})</span>`).join('');
+      const apps = cl.top_apps.map(a => `<span style="font-size:10px;color:var(--text-dim)">${a.name}</span>`).join(', ');
+      html += `<div class="bug-cluster-card" style="border-color:rgba(99,102,241,0.15)">
+        <div class="bug-cluster-name" style="color:#a5b4fc">🏷️ ${cl.raw_tipe}</div>
+        <div class="bug-cluster-bar-wrap">
+          <div class="bug-cluster-bar"><div class="bug-cluster-bar-fill"
+            style="width:${Math.round(cl.count/maxCount*100)}%;background:linear-gradient(90deg,#6366f1,#8b5cf6)"></div></div>
+          <div class="bug-cluster-count" style="color:#a5b4fc">${fmt(cl.count)}</div>
+        </div>
+        <div class="bug-cluster-pct">${cl.pct}% dari tiket belum terkategori</div>
+        ${subs ? `<div class="bug-cluster-apps" style="margin-top:6px">${subs}</div>` : ''}
+        ${apps ? `<div style="font-size:10px;color:var(--text-dim);margin-top:4px">Apps: ${apps}</div>` : ''}
+      </div>`;
+    }
+    html += '</div></div>';
+  }
+
+  // ── Section 3: Ticket Table ───────────────────────────────────
+  html += `<div class="card">
+    <div class="card-title" style="color:#94a3b8">📋 Daftar Tiket — Rekomendasi Sementara
+      <span style="color:var(--text-dim);font-size:11.5px;font-weight:400"> (filter untuk menyaring)</span>
+    </div>
+    <div class="unc-filter-bar">
+      <button class="unc-filter-btn active" id="fbtn-all" onclick="filterInsights('all')">Semua (${fmt(ins.total)})</button>`;
+  for (const g of ins.groups||[]) {
+    const cfg = tipeConfig[g.suggested_tipe] || {};
+    html += `<button class="unc-filter-btn" id="fbtn-${g.suggested_tipe.replace(/[^a-z]/gi,'')}"
+      onclick="filterInsights('${g.suggested_tipe}')">${cfg.icon||''} ${g.suggested_tipe} (${g.count})</button>`;
+  }
+  html += `<button class="unc-filter-btn" id="fbtn-tinggi" onclick="filterInsights('tinggi')">🎯 Konfidence Tinggi</button>
+    </div>
+    <div id="insights-table-wrap" style="overflow-x:auto"></div>
+  </div>`;
+
+  el.innerHTML = html;
+  renderInsightsTable(ins.tickets || []);
+}
+
+async function refreshDiscover() {
+  const el = document.getElementById('insights-content');
+  el.innerHTML = '<div class="loading-state"><div class="spinner"></div>AI sedang menganalisis pola...<br><small style="color:var(--text-dim)">Proses ini membutuhkan beberapa detik</small></div>';
+  _discoverData = await api('/api/uncategorized/discover?refresh=1');
+  _new_categories_cache = null;
+  loadInsights();
+}
+
+function filterInsights(filter) {
+  _insightsFilter = filter;
+  document.querySelectorAll('.unc-filter-btn').forEach(b => b.classList.remove('active'));
+  const id = filter==='all' ? 'fbtn-all' : filter==='tinggi' ? 'fbtn-tinggi' : `fbtn-${filter.replace(/[^a-z]/gi,'')}`;
+  const btn = document.getElementById(id);
+  if (btn) btn.classList.add('active');
+  const tickets = _insightsData?.tickets || [];
+  let filtered = filter==='tinggi' ? tickets.filter(t=>t.confidence>=0.7)
+               : filter!=='all'    ? tickets.filter(t=>t.suggested_tipe===filter)
+               : tickets;
+  renderInsightsTable(filtered);
+}
+
+function renderInsightsTable(tickets) {
+  const wrap = document.getElementById('insights-table-wrap');
+  if (!wrap) return;
+  if (!tickets.length) { wrap.innerHTML = '<div class="empty-state" style="padding:20px"><h3>Tidak ada tiket</h3></div>'; return; }
+  const tipeColor = {'Human Error':'#f87171','Bug Aplikasi':'#fcd34d','Tools & Knowledge':'#6ee7b7'};
+  const confClass = {Tinggi:'conf-tinggi',Sedang:'conf-sedang',Rendah:'conf-rendah'};
+  const urgColor  = {Critical:'#f87171',High:'#fca5a5',Medium:'#fcd34d',Low:'#6ee7b7'};
+  const rows = tickets.slice(0,100).map(t=>`<tr>
+    <td class="td-tiket">${t.no_tiket||'—'}</td>
+    <td style="font-size:12px;max-width:140px">${t.judul||'—'}</td>
+    <td class="td-summary">${t.summary||'—'}</td>
+    <td style="font-size:11px;color:var(--text-dim);max-width:130px">${t.root_cause||'—'}</td>
+    <td><span class="tag" style="color:#a5b4fc;font-size:10.5px">${t.raw_tipe||'—'}</span></td>
+    <td>
+      <span style="color:${tipeColor[t.suggested_tipe]||'#94a3b8'};font-size:12px;font-weight:600">${t.suggested_tipe||'—'}</span><br>
+      <span class="conf-badge ${confClass[t.conf_label]||'conf-rendah'}">${t.conf_label} (${Math.round((t.confidence||0)*100)}%)</span>
+    </td>
+    <td style="font-size:11px;color:var(--text-dim);max-width:150px;font-style:italic">${t.reasoning||'—'}</td>
+    <td><span style="color:${urgColor[t.urgensi]||'#6ee7b7'};font-weight:600;font-size:12px">${t.urgensi||'—'}</span></td>
+    <td><span class="pill pill-app">${t.aplikasi_terkait||'N/A'}</span></td>
+  </tr>`).join('');
+  const more = tickets.length>100 ? `<tr><td colspan="9" style="text-align:center;color:var(--text-dim);font-size:12px">... dan ${fmt(tickets.length-100)} tiket lainnya</td></tr>` : '';
+  wrap.innerHTML = `<table><thead><tr>
+    <th>No. Tiket</th><th>Judul</th><th>Summary AI</th><th>Root Cause</th>
+    <th>Tipe Asal (AI)</th><th>Rekomendasi</th><th>Alasan</th><th>Urgensi</th><th>Aplikasi</th>
+  </tr></thead><tbody>${rows}${more}</tbody></table>`;
+}
+
+
+
+
+
+// ── Categories ──────────────────────────────────────────────────────
+
+async function loadCategories() {
+  loadFilterOptions();
+  const cats = await api('/api/categories');
+  const el = document.getElementById('cat-explore-content');
+  if (!cats?.length) { el.innerHTML='<div class="empty-state"><h3>Belum Ada Kategori</h3><p>Tunggu analisis selesai.</p></div>'; return; }
+  el.innerHTML = '<div class="cat-explore-grid">' +
+    cats.map(cat=>`<div class="cat-explore-card" onclick="selectCat(${JSON.stringify(cat.kategori_utama)})">
+      <div class="cat-explore-name">📁 ${cat.kategori_utama}</div>
+      <div class="cat-explore-desc">${cat.deskripsi||''}</div>
+      <div class="cat-explore-subs">${(cat.sub_kategori||[]).map(s=>`<span class="sub-pill">${s}</span>`).join('')}</div>
+    </div>`).join('') + '</div>';
+}
+function selectCat(cat) { const s=document.getElementById('subcat-kategori-select'); if(s)s.value=cat; loadSubcategories(); }
+async function loadSubcategories() {
+  const cat = document.getElementById('subcat-kategori-select')?.value||'';
+  const d = await api('/api/subcategories?kategori='+encodeURIComponent(cat));
+  const el = document.getElementById('subcat-bar-list');
+  if (!d?.length) { el.innerHTML='<div style="color:var(--text-dim);font-size:13px">Pilih kategori untuk melihat sub-kategori.</div>'; return; }
+  const mx=d[0].count||1;
+  el.innerHTML=d.map(it=>`<div class="cat-bar-item">
+    <div class="cat-bar-label">${it.name}</div>
+    <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${Math.round(it.count/mx*100)}%"></div></div>
+    <div class="cat-bar-count">${fmt(it.count)}</div>
+  </div>`).join('');
+}
+
+// ── Upload ──────────────────────────────────────────────────────────
+function openUploadModal()  { document.getElementById('upload-modal').classList.add('open'); }
+function closeUploadModal() {
+  document.getElementById('upload-modal').classList.remove('open');
+  selectedFile=null;
+  const n=document.getElementById('file-selected-name'); if(n) n.style.display='none';
+  const b=document.getElementById('upload-btn');         if(b) { b.disabled=true; b.textContent='🚀 Upload & Analisa'; }
+}
+function onModalOverlayClick(e) { if(e.target.id==='upload-modal') closeUploadModal(); }
+function onFileSelected(e) {
+  selectedFile=e.target.files[0];
+  if (selectedFile) {
+    document.getElementById('file-selected-name').textContent='✅ '+selectedFile.name+' ('+(selectedFile.size/1048576).toFixed(1)+' MB)';
+    document.getElementById('file-selected-name').style.display='block';
+    document.getElementById('upload-btn').disabled=false;
+  }
+}
+function onDragOver(e)  { e.preventDefault(); document.getElementById('dropzone').classList.add('drag-over'); }
+function onDragLeave()  { document.getElementById('dropzone').classList.remove('drag-over'); }
+function onDrop(e) {
+  e.preventDefault(); document.getElementById('dropzone').classList.remove('drag-over');
+  const f=e.dataTransfer.files[0];
+  if (f?.name?.endsWith('.xlsx')) {
+    selectedFile=f;
+    document.getElementById('file-selected-name').textContent='✅ '+f.name+' ('+(f.size/1048576).toFixed(1)+' MB)';
+    document.getElementById('file-selected-name').style.display='block';
+    document.getElementById('upload-btn').disabled=false;
+  } else alert('Hanya file .xlsx yang didukung');
+}
+async function doUpload() {
+  if (!selectedFile) return;
+  const btn=document.getElementById('upload-btn');
+  btn.disabled=true; btn.textContent='⏳ Mengunggah...';
+  try {
+    const fd=new FormData(); fd.append('file',selectedFile);
+    const r=await fetch('/api/upload',{method:'POST',body:fd});
+    const d=await r.json();
+    if (d.error) { alert('Error: '+d.error); btn.disabled=false; btn.textContent='🚀 Upload & Analisa'; return; }
+    closeUploadModal(); toastHidden=false; showToast(); startPoll();
+  } catch(e) { alert('Upload gagal: '+e.message); btn.disabled=false; btn.textContent='🚀 Upload & Analisa'; }
+}
+
+// ── Progress Toast ──────────────────────────────────────────────────
+function showToast()  { document.getElementById('progress-toast').classList.add('show'); }
+function hideToast()  { document.getElementById('progress-toast').classList.remove('show'); toastHidden=true; stopPoll(); }
+function startPoll()  { if(progressInterval) clearInterval(progressInterval); progressInterval=setInterval(pollProgress,2500); pollProgress(); }
+function stopPoll()   { if(progressInterval){clearInterval(progressInterval);progressInterval=null;} }
+
+const PHASE={starting:'🚀 Memulai...', ingestion:'📂 Membaca Excel...', discovery:'🔍 Menemukan Kategori...', analyzing:'🤖 Menganalisa Tiket...', output:'📊 Menulis Hasil...', done:'✅ Selesai!', error:'❌ Error', idle:'—'};
+
+async function pollProgress() {
+  const st = await api('/api/progress');
+  if (!st) return;
+  const running=st.status==='running', done=st.status==='done', err=st.status==='error';
+  if ((running||done) && !toastHidden) showToast();
+  const el = id => document.getElementById(id);
+  if (el('toast-title')) el('toast-title').textContent = PHASE[st.phase]||PHASE[st.status]||'Analisis Berjalan...';
+  if (el('toast-msg'))   el('toast-msg').textContent   = st.message||'';
+  if (el('progress-bar'))el('progress-bar').style.width= (st.percent||0)+'%';
+  if (el('progress-pct'))el('progress-pct').textContent= (st.percent||0)+'%';
+  const spin=document.getElementById('toast-spinner');
+  if (spin) spin.style.display=running?'inline-block':'none';
+  if (done) { stopPoll(); setTimeout(()=>{loadStats();refreshAll();},2000); }
+  if (err)  { stopPoll(); }
+}
+
+// ── Export ──────────────────────────────────────────────────────────
+function exportExcel() { window.location.href='/api/export/excel'; }
+
+// ── Init ────────────────────────────────────────────────────────────
+console.log('✅ Pelindo Dashboard loaded');
+loadStats();
+startPoll(); // always poll — shows toast if analysis running from terminal
+</script>
+</body>
+</html>
